@@ -21,7 +21,6 @@ python plotting.py -e 100 # for the 100th epoch
 ```
 
 ## Will be added soon
-* cuda support
 * Fast-ISTA
 
 ## References
