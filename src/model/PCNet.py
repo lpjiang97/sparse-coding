@@ -22,8 +22,9 @@ class PCNet(nn.Module):
         self.R_epochs = R_epochs
         self.R_lr = R_lr
         self.lmda = lmda
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         # model weigths
-        self.U = torch.randn(self.K, self.M ** 2, requires_grad=True)
+        self.U = torch.randn(self.K, self.M ** 2, requires_grad=True, device=self.device)
         with torch.no_grad():
             self.U = F.normalize(self.U, dim=1)
         self.U.requires_grad_(True)
@@ -33,7 +34,7 @@ class PCNet(nn.Module):
     def _ista(self, img_batch):
         # create R
         batch_size = img_batch.shape[0]
-        self.R = torch.zeros((batch_size, self.K), requires_grad=True)
+        self.R = torch.zeros((batch_size, self.K), requires_grad=True, device=self.device)
         # trian
         for _ in range(self.R_epochs):
             # pred

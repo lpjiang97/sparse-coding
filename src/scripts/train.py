@@ -12,10 +12,12 @@ from src.utils.cmd_line import parse_args
 ### HYPERPARAMS ###
 arg = parse_args()
 
+# if use cuda
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # create net
 pcnet = PCNet(arg.n_neuron, arg.size, R_epochs=arg.r_epoch, R_lr=arg.r_learning_rate, lmda=arg.reg)
 # get data
-X = load_all_patches(arg.batch_size, arg.size)
+X = load_all_patches(arg.batch_size, arg.size).to(device)
 # train
 for x in tqdm(range(arg.epoch), desc='training', total=arg.epoch):
     # sample patches
