@@ -2,42 +2,49 @@ import os
 import sys
 sys.path.insert(0, os.path.abspath('../../.'))
 from tqdm import tqdm
-import random
 import torch
-import torch.nn.functional as F
-from src.model.PCNet import PCNet
-from src.model.ImageDataset import load_all_patches
+from src.model.SparseNet import SparseNet
+from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
+from src.model.ImageDataset import NatPatchDataset
 from src.utils.cmd_line import parse_args
+from src.scripts.plotting import plot_rf
 
-### HYPERPARAMS ###
+
+# save to tensorboard
+board = SummaryWriter("../../runs/sparse-net")
 arg = parse_args()
-
 # if use cuda
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # create net
-pcnet = PCNet(arg.n_neuron, arg.size, R_epochs=arg.r_epoch, R_lr=arg.r_learning_rate, lmda=arg.reg)
-# get data
-X = load_all_patches(arg.batch_size, arg.size).to(device)
+sparse_net = SparseNet(arg.n_neuron, arg.size, R_lr=arg.r_learning_rate, lmda=arg.reg, device=device)
+# load data
+dataloader = DataLoader(NatPatchDataset(arg.batch_size, arg.size, arg.size), batch_size=250)
 # train
-for x in tqdm(range(arg.epoch), desc='training', total=arg.epoch):
-    # sample patches
-    idx = random.sample(range(X.shape[0]), arg.batch_size)
-    image_batch = X[idx, :]
-    # update
-    pred = pcnet(image_batch)
-    loss = ((image_batch - pred) ** 2).sum()
-    loss.backward()
-    # update U
-    pcnet.U.data.sub_(arg.learning_rate * pcnet.U.grad.data)
-    # zero grad
-    pcnet.zero_grad()
-    # normalize
-    with torch.no_grad():
-        pcnet.U = F.normalize(pcnet.U, dim=1)
-    pcnet.U.requires_grad_(True)
-    # save
-    if x % 100 == 0:
-        torch.save(pcnet, f"../../trained_models/model_epoch-{x}_N-{arg.batch_size}_K-{arg.n_neuron}_M-{arg.size}_lmda-{arg.reg}_Rlr_{arg.r_learning_rate}_Ulr_{arg.learning_rate}.pth")
-
-torch.save(pcnet, f"../../trained_models/model_epoch-{x+1}_N-{arg.batch_size}_K-{arg.n_neuron}_M-{arg.size}_lmda-{arg.reg}_Rlr_{arg.r_learning_rate}_Ulr_{arg.learning_rate}.pth")
-
+optim = torch.optim.SGD([{'params': sparse_net.U.weight, "lr": arg.learning_rate}])
+for e in range(arg.epoch):
+    running_loss = 0
+    c = 0
+    for img_batch in tqdm(dataloader, desc='training', total=len(dataloader)):
+        img_batch = img_batch.reshape(img_batch.shape[0], -1).to(device)
+        # update
+        pred = sparse_net(img_batch)
+        loss = ((img_batch - pred) ** 2).sum()
+        running_loss += loss.item()
+        loss.backward()
+        # update U
+        optim.step()
+        # zero grad
+        sparse_net.zero_grad()
+        # norm
+        sparse_net.normalize_weights()
+        c += 1
+    board.add_scalar('Loss', running_loss / c, e * len(dataloader) + c)
+    if e % 5 == 4:
+        # plotting
+        fig = plot_rf(sparse_net.U.weight.T.reshape(arg.n_neuron, arg.size, arg.size).cpu().data.numpy(), arg.n_neuron, arg.size)
+        board.add_figure('RF', fig, global_step=e * len(dataloader) + c)
+    if e % 10 == 9:
+        # save checkpoint
+        torch.save(sparse_net, f"../../trained_models/ckpt-{e+1}.pth")
+torch.save(sparse_net, f"../../trained_models/ckpt-{e+1}.pth")
