@@ -3,10 +3,11 @@
 ![](./trained_models/RF.png)
 
 This is an implementation of Olshausen and Field's sparse coding paper in PyTorch. Iterative Shrinkage/Thresholding Algorithm 
-(ISTA) is used to fit neuronal responses for the input. Gradients for receptive fields are calculated through PyTorhc's autograd
+(ISTA) is used to fit neuronal responses for the input. Gradients for receptive fields are calculated through PyTorh's autograd
 feature. 
 
 ## Run
+To run the program:
 ```python
 cd src/scripts
 python train.py 
@@ -15,9 +16,9 @@ To see a list of available hyperparameters to change:
 ```python
 python train.py -h
 ```
-A checkpoint of the model is saved every 100 epochs. To plot the receptive fields:
+A checkpoint of the model is saved every 10 epochs to `trained_models`. To see the tensorboard logs:
 ```python
-python plotting.py -e 100 # for the 100th epoch
+tensorboard --logdir=runs
 ```
 
 ## Will be added soon
